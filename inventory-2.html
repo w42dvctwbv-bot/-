@@ -924,37 +924,41 @@ async function cloudGet() {
     return null;
   }
   setSyncStatus('syncing', '同步中…');
-
-  // Use JSONP — only method that works cross-origin with Google Apps Script
   return new Promise((resolve) => {
-    const cb = '_cb' + Date.now();
-    const script = document.createElement('script');
+    const cbName = 'gs_' + Math.random().toString(36).slice(2, 8);
+    let done = false;
     const timer = setTimeout(() => {
-      delete window[cb];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      setSyncStatus('error', '連線逾時，使用本地資料');
+      if (done) return;
+      done = true;
+      try { delete window[cbName]; } catch(e){}
+      setSyncStatus('error', '連線逾時');
       resolve(null);
-    }, 12000);
-    window[cb] = (j) => {
+    }, 15000);
+    window[cbName] = function(response) {
+      if (done) return;
+      done = true;
       clearTimeout(timer);
-      delete window[cb];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      if (j && j.ok) {
+      try { delete window[cbName]; } catch(e){}
+      if (response && response.ok) {
         setSyncStatus('ok', '已同步', new Date().toLocaleTimeString('zh-TW'));
-        resolve(j.data);
+        resolve(response.data || {});
       } else {
-        setSyncStatus('error', j ? j.error : '未知錯誤');
+        setSyncStatus('error', (response && response.error) || '回應錯誤');
         resolve(null);
       }
     };
-    script.src = API_URL + '?action=getData&callback=' + cb;
-    script.onerror = () => {
+    const s = document.createElement('script');
+    s.type = 'text/javascript';
+    s.async = true;
+    s.src = API_URL + '?action=getData&callback=' + cbName + '&t=' + Date.now();
+    s.onerror = function() {
+      if (done) return;
+      done = true;
       clearTimeout(timer);
-      delete window[cb];
-      setSyncStatus('error', '連線失敗');
+      setSyncStatus('error', 'Script 載入失敗');
       resolve(null);
     };
-    document.head.appendChild(script);
+    (document.head || document.body).appendChild(s);
   });
 }
 
@@ -1344,7 +1348,6 @@ function renderAll() {
 
 // ===== INIT =====
 async function init() {
-  // Restore editor name
   const savedEditor = localStorage.getItem('anHeng_editor');
   if (savedEditor) document.getElementById('editorName').value = savedEditor;
   document.getElementById('editorName').addEventListener('change', e => {
@@ -1356,25 +1359,26 @@ async function init() {
   document.getElementById('lastUpdated').textContent = '更新：' + dateStr;
   document.getElementById('footerDate').textContent = dateStr;
 
-  // Try cloud first; if cloud has data use it, else use local cache, else use defaults
+  // 先用本地快取或預設資料馬上渲染，不讓畫面空白
+  const cached = localStorage.getItem(LS_KEY);
+  if (cached) {
+    try { data = JSON.parse(cached); } catch(e) { data = JSON.parse(JSON.stringify(defaultData)); }
+  } else {
+    data = JSON.parse(JSON.stringify(defaultData));
+  }
+  renderAll();
+
+  // 再從雲端拉最新資料
   const cloudData = await cloudGet();
   if (cloudData && Object.keys(cloudData).length > 0) {
-    // Cloud has data — merge into local
-    mergeCloudData(cloudData);
-    saveLocal();
-  } else if (localStorage.getItem(LS_KEY)) {
-    // No cloud data but have local cache — use it
-    data = JSON.parse(localStorage.getItem(LS_KEY));
-  } else {
-    // Nothing anywhere — use defaults and push to cloud
-    data = JSON.parse(JSON.stringify(defaultData));
+    const changed = mergeCloudData(cloudData);
+    if (changed) { saveLocal(); renderAll(); }
+  } else if (!cached) {
+    // 完全沒有資料，把預設資料推到雲端
     saveLocal();
     cloudSaveAll();
   }
 
-  renderAll();
-
-  // Poll every 15 seconds
   setInterval(pollCloud, POLL_INTERVAL);
 }
 
