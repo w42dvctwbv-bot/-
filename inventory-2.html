@@ -923,26 +923,39 @@ async function cloudGet() {
     setSyncStatus('error', '尚未設定 API 網址');
     return null;
   }
-  try {
-    setSyncStatus('syncing', '同步中…');
-    const j = await jsonp(API_URL + '?action=getData');
-    if (!j.ok) throw new Error(j.error);
-    const now = new Date().toLocaleTimeString('zh-TW');
-    setSyncStatus('ok', '已同步', now);
-    return j.data;
-  } catch(e) {
-    // fallback to fetch
-    try {
-      const r = await fetch(API_URL + '?action=getData', { cache: 'no-store' });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-      setSyncStatus('ok', '已同步', new Date().toLocaleTimeString('zh-TW'));
-      return j.data;
-    } catch(e2) {
-      setSyncStatus('error', '同步失敗：' + e2.message);
-      return null;
-    }
-  }
+  setSyncStatus('syncing', '同步中…');
+
+  // Use JSONP — only method that works cross-origin with Google Apps Script
+  return new Promise((resolve) => {
+    const cb = '_cb' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      setSyncStatus('error', '連線逾時，使用本地資料');
+      resolve(null);
+    }, 12000);
+    window[cb] = (j) => {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      if (j && j.ok) {
+        setSyncStatus('ok', '已同步', new Date().toLocaleTimeString('zh-TW'));
+        resolve(j.data);
+      } else {
+        setSyncStatus('error', j ? j.error : '未知錯誤');
+        resolve(null);
+      }
+    };
+    script.src = API_URL + '?action=getData&callback=' + cb;
+    script.onerror = () => {
+      clearTimeout(timer);
+      delete window[cb];
+      setSyncStatus('error', '連線失敗');
+      resolve(null);
+    };
+    document.head.appendChild(script);
+  });
 }
 
 async function cloudSave(key, value, fieldLabel, oldValue) {
