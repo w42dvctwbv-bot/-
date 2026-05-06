@@ -6,6 +6,20 @@
 <title>安桁庫存管理系統</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
+/* ── 密碼畫面 ── */
+#lockScreen{position:fixed;inset:0;background:#2a2118;display:flex;align-items:center;justify-content:center;z-index:9999;}
+#lockScreen.hidden{display:none;}
+.lock-box{background:#f5f0e8;border-radius:8px;padding:40px 48px;text-align:center;width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.lock-box .logo{font-family:'DM Mono',monospace;font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:#8b5e3c;margin-bottom:6px;}
+.lock-box h2{font-family:'DM Serif Display',serif;font-size:1.6rem;color:#2a2118;margin-bottom:24px;}
+.lock-box input{width:100%;padding:11px 14px;border:1.5px solid #c8b89a;border-radius:4px;font-family:'DM Mono',monospace;font-size:1rem;text-align:center;letter-spacing:0.12em;background:#faf7f2;color:#2a2118;outline:none;transition:border-color 0.15s;}
+.lock-box input:focus{border-color:#8b5e3c;}
+.lock-box input.error{border-color:#c0392b;animation:shake 0.3s;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.lock-box button{margin-top:14px;width:100%;padding:11px;background:#8b5e3c;color:#fff;border:none;border-radius:4px;font-family:'DM Mono',monospace;font-size:0.78rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;transition:background 0.15s;}
+.lock-box button:hover{background:#7a5234;}
+.lock-box .err-msg{margin-top:10px;font-size:0.75rem;color:#c0392b;font-family:'DM Mono',monospace;min-height:18px;}
+
 :root{--bg:#f5f0e8;--bg2:#ede8dc;--panel:#faf7f2;--border:#c8b89a;--border-light:#ddd4c0;--accent:#8b5e3c;--accent2:#c4864e;--text:#2a2118;--text-muted:#7a6a55;--red:#c0392b;--green:#27715a;--yellow:#b8860b;--tag-bg:#e8dcc8;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);}
@@ -85,6 +99,17 @@ footer{margin-top:36px;padding:18px 32px;border-top:1px solid var(--border-light
 </style>
 </head>
 <body>
+
+<!-- 密碼鎖畫面 -->
+<div id="lockScreen">
+  <div class="lock-box">
+    <div class="logo">Giorgio Graesan · 安桁</div>
+    <h2>庫存管理系統</h2>
+    <input type="password" id="pwInput" placeholder="輸入密碼" maxlength="30">
+    <button id="pwBtn">進入</button>
+    <div class="err-msg" id="errMsg"></div>
+  </div>
+</div>
 <header>
   <div>
     <div class="subtitle">Giorgio Graesan · 安桁</div>
@@ -592,6 +617,36 @@ function init(){
   document.getElementById('logsRefreshBtn').addEventListener('click',loadLogs);
 }
 
+// ── 密碼保護 ──────────────────────────────────────────
+var PW = 'enhan123';
+var PW_KEY = 'anHeng_auth';
+
+function checkAuth(){
+  if(sessionStorage.getItem(PW_KEY)==='ok'){
+    document.getElementById('lockScreen').classList.add('hidden');
+    return;
+  }
+  // 綁定按鈕和 Enter 鍵
+  function tryPassword(){
+    var inp = document.getElementById('pwInput');
+    var err = document.getElementById('errMsg');
+    if(inp.value === PW){
+      sessionStorage.setItem(PW_KEY,'ok');
+      document.getElementById('lockScreen').classList.add('hidden');
+    } else {
+      inp.classList.add('error');
+      err.textContent = '密碼錯誤，請再試一次';
+      setTimeout(function(){inp.classList.remove('error');},400);
+      inp.value='';
+    }
+  }
+  document.getElementById('pwBtn').addEventListener('click', tryPassword);
+  document.getElementById('pwInput').addEventListener('keydown', function(e){
+    if(e.key==='Enter') tryPassword();
+  });
+}
+
+checkAuth();
 init();
 </script>
 </body>
