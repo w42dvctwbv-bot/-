@@ -624,15 +624,16 @@ var PW_KEY = 'anHeng_auth';
 function checkAuth(){
   if(sessionStorage.getItem(PW_KEY)==='ok'){
     document.getElementById('lockScreen').classList.add('hidden');
+    init();
     return;
   }
-  // 綁定按鈕和 Enter 鍵
   function tryPassword(){
     var inp = document.getElementById('pwInput');
     var err = document.getElementById('errMsg');
     if(inp.value === PW){
       sessionStorage.setItem(PW_KEY,'ok');
       document.getElementById('lockScreen').classList.add('hidden');
+      init();
     } else {
       inp.classList.add('error');
       err.textContent = '密碼錯誤，請再試一次';
@@ -647,7 +648,6 @@ function checkAuth(){
 }
 
 checkAuth();
-init();
 </script>
 </body>
 </html>
