@@ -322,12 +322,11 @@ function cloudSaveAll(){
 }
 
 // ── merge cloud data ──────────────────────────────────
-var lastLocalEdit = 0; // 記錄最後一次本地編輯的時間
+var lastLocalEdit = 0;
 
 function mergeCloud(cd){
   if(!cd) return false;
-  // 如果 30 秒內有本地編輯，跳過雲端同步（避免覆蓋剛改的資料）
-  if(Date.now() - lastLocalEdit < 30000) return false;
+  if(Date.now() - lastLocalEdit < 120000) return false;
   var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs','pigIgnore'];
   var changed=false;
   keys.forEach(function(k){
@@ -677,14 +676,17 @@ function init(){
   // 先用快取或預設資料馬上渲染
   var cached=localStorage.getItem(LS_KEY);
   if(cached){try{data=JSON.parse(cached);}catch(e){data=JSON.parse(JSON.stringify(defaultData));}}
+  if(!data.pigIgnore) data.pigIgnore={};
   renderAll();
 
   // 再從雲端拉最新
   cloudGet().then(function(cd){
     if(cd&&Object.keys(cd).length>0){
       var changed=mergeCloud(cd);
+      if(!data.pigIgnore) data.pigIgnore={};
       if(changed){saveLocal();renderAll();}
     } else if(!cached){
+      data.pigIgnore={};
       saveLocal(); cloudSaveAll();
     }
   });
