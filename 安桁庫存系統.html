@@ -63,6 +63,14 @@ tbody td{padding:7px 12px;vertical-align:middle;}
 .note-cell input:hover{border-color:var(--border);background:var(--bg);}
 .note-cell input:focus{outline:none;border-color:var(--accent);background:#fff;}
 .brand-group-row td{background:var(--tag-bg);font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);padding:7px 14px;border-top:2px solid var(--border);}
+/* 不追蹤核取方塊 */
+.ignore-cell{text-align:center;width:36px;}
+.ignore-cell input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+.ignored-row{opacity:0.45;}
+.ignored-row .name-cell::after{content:' ·不追蹤';font-size:0.65rem;color:var(--text-muted);font-family:'DM Mono',monospace;font-weight:400;}
+/* 色料不追蹤按鈕 */
+.pig-ignore{font-size:0.6rem;font-family:'DM Mono',monospace;cursor:pointer;color:var(--text-muted);background:none;border:1px solid var(--border-light);border-radius:2px;padding:1px 4px;margin-left:3px;vertical-align:middle;}
+.pig-ignore.active{color:var(--accent);border-color:var(--accent);background:var(--tag-bg);}
 .status-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:0.63rem;font-weight:600;padding:2px 7px;border-radius:2px;white-space:nowrap;}
 .status-badge.empty{background:rgba(192,57,43,0.1);color:var(--red);}
 .status-badge.low{background:rgba(184,134,11,0.12);color:var(--yellow);}
@@ -88,7 +96,12 @@ tbody td{padding:7px 12px;vertical-align:middle;}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn.primary:hover{background:#7a5234;}
 .toolbar{display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px;gap:4px;}
-.log-table{font-size:0.74rem;}
+.ignored-row{opacity:0.38;}
+.ignore-cell{text-align:center;width:52px;}
+.ignore-cell input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+.pig-ignore{font-size:0.65rem;background:none;border:1px solid var(--border-light);border-radius:3px;cursor:pointer;padding:1px 3px;opacity:0.35;line-height:1;transition:all 0.15s;}
+.pig-ignore:hover{opacity:0.8;}
+.pig-ignore.active{opacity:1;background:var(--tag-bg);border-color:var(--accent);}
 .log-table td{padding:6px 12px;}
 .log-time{font-family:'DM Mono',monospace;font-size:0.67rem;color:var(--text-muted);white-space:nowrap;}
 .log-editor{font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;color:var(--accent);}
@@ -150,7 +163,7 @@ footer{margin-top:36px;padding:18px 32px;border-top:1px solid var(--border-light
     <h3>所有塗料產品庫存</h3>
     <div class="table-card">
       <table id="overviewTable">
-        <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th></tr></thead>
+        <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th><th class="ignore-cell" title="不追蹤警示">🔕</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -160,7 +173,7 @@ footer{margin-top:36px;padding:18px 32px;border-top:1px solid var(--border-light
   <div class="section-title">所有塗料產品庫存 <span class="mono">Paint Products</span></div>
   <div class="table-card">
     <table id="allProductsTable">
-      <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th></tr></thead>
+      <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th><th class="ignore-cell" title="不追蹤警示">🔕</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -307,7 +320,7 @@ function cloudSaveAll(){
 // ── merge cloud data ──────────────────────────────────
 function mergeCloud(cd){
   if(!cd) return false;
-  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs'];
+  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs','ignoreList'];
   var changed=false;
   keys.forEach(function(k){
     if(cd[k]!==undefined&&JSON.stringify(cd[k])!==JSON.stringify(data[k])){
@@ -370,18 +383,19 @@ function buildProductRows(tbody,items){
     if(brand!==lastBrand){
       lastBrand=brand;
       var gtr=document.createElement('tr'); gtr.className='brand-group-row';
-      var gtd=document.createElement('td'); gtd.colSpan=6; gtd.textContent=BRANDS[brand]||brand;
+      var gtd=document.createElement('td'); gtd.colSpan=7; gtd.textContent=BRANDS[brand]||brand;
       gtr.appendChild(gtd); tbody.appendChild(gtr);
     }
     var tr=document.createElement('tr');
+    if(item.ignore) tr.classList.add('ignored-row');
     var bn=parseFloat(item.big);
-    if(!isNaN(bn)&&bn<5) tr.style.background=bn===0?'rgba(192,57,43,0.05)':'rgba(184,134,11,0.04)';
+    if(!item.ignore&&!isNaN(bn)&&bn<5) tr.style.background=bn===0?'rgba(192,57,43,0.05)':'rgba(184,134,11,0.04)';
 
     var tdN=document.createElement('td'); tdN.className='name-cell'; tdN.textContent=item.name; tr.appendChild(tdN);
 
     var tdB=document.createElement('td'); tdB.className='num-cell';
     var inB=numInput(item.big,function(v,ov){item.big=v;cloudSave('orderItems',data.orderItems,item.name+' 大倉',ov);renderLowStock();});
-    if(!isNaN(bn)&&bn<5) inB.style.color=bn===0?'var(--red)':'var(--yellow)';
+    if(!item.ignore&&!isNaN(bn)&&bn<5) inB.style.color=bn===0?'var(--red)':'var(--yellow)';
     tdB.appendChild(inB); tr.appendChild(tdB);
 
     var tdS=document.createElement('td'); tdS.className='num-cell';
@@ -391,13 +405,27 @@ function buildProductRows(tbody,items){
     var tdO=document.createElement('td'); tdO.className='num-cell';
     if(item.order===undefined) item.order='';
     var inO=numInput(item.order,function(v,ov){item.order=v;cloudSave('orderItems',data.orderItems,item.name+' 叫貨數',ov);});
-    if(item.order&&parseFloat(item.order)>0){inO.style.color='var(--yellow)';inO.style.fontWeight='600';tr.style.background='rgba(184,134,11,0.06)';}
+    if(!item.ignore&&item.order&&parseFloat(item.order)>0){inO.style.color='var(--yellow)';inO.style.fontWeight='600';tr.style.background='rgba(184,134,11,0.06)';}
     tdO.appendChild(inO); tr.appendChild(tdO);
 
-    var tdSt=document.createElement('td'); tdSt.appendChild(makeBadge(item.big)); tr.appendChild(tdSt);
+    var tdSt=document.createElement('td'); tdSt.appendChild(item.ignore?document.createTextNode(''):makeBadge(item.big)); tr.appendChild(tdSt);
+
     var tdNt=document.createElement('td'); tdNt.className='note-cell';
     tdNt.appendChild(textInput(item.note,function(v){item.note=v;cloudSave('orderItems',data.orderItems,item.name+' 備註','');}));
     tr.appendChild(tdNt);
+
+    // 🔕 不追蹤核取方塊
+    var tdI=document.createElement('td'); tdI.className='ignore-cell';
+    var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!item.ignore;
+    cb.title='勾選後不顯示在警示';
+    cb.addEventListener('change',function(){
+      item.ignore=cb.checked;
+      if(cb.checked){tr.classList.add('ignored-row');tr.style.background='';}
+      else{tr.classList.remove('ignored-row');}
+      cloudSave('orderItems',data.orderItems,item.name+' 不追蹤',!cb.checked);
+      renderLowStock();
+    });
+    tdI.appendChild(cb); tr.appendChild(tdI);
     tbody.appendChild(tr);
   });
 }
@@ -409,7 +437,7 @@ function makeAlertBox(id,title,alerts,threshold){
   var c=document.getElementById(id); c.innerHTML='';
   if(alerts.length===0){
     var d=document.createElement('div'); d.className='no-alert';
-    d.innerHTML='<strong>'+title+'</strong><br>✓ 庫存正常（均 ≥ '+threshold+'）';
+    d.innerHTML='<strong>'+title+'</strong><br>✓ 庫存正常';
     c.appendChild(d); return;
   }
   var box=document.createElement('div'); box.className='alert-box';
@@ -428,6 +456,7 @@ function renderLowStock(){
   var LOW=5;
   var pa=[];
   data.orderItems.forEach(function(i){
+    if(i.ignore) return;
     var n=parseFloat(i.big);
     if(!isNaN(n)&&n<LOW) pa.push({name:i.name,qty:i.big,section:i.brand==='SI'?'Stucco':'GG'});
   });
@@ -435,8 +464,14 @@ function renderLowStock(){
   var pia=[];
   function scanPig(rows,label){
     rows.forEach(function(row){
-      if(row.big) row.codes.forEach(function(c,ci){if(parseFloat(row.big[ci])===0) pia.push({name:c,qty:0,section:label+'大罐'});});
-      row.codes.forEach(function(c,ci){if(parseFloat(row.small[ci])===0) pia.push({name:c,qty:0,section:label+'小罐'});});
+      if(row.big) row.codes.forEach(function(c,ci){
+        if(row.bigIgnore&&row.bigIgnore[ci]) return;
+        if(parseFloat(row.big[ci])===0) pia.push({name:c,qty:0,section:label+'大罐'});
+      });
+      row.codes.forEach(function(c,ci){
+        if(row.smallIgnore&&row.smallIgnore[ci]) return;
+        if(parseFloat(row.small[ci])===0) pia.push({name:c,qty:0,section:label+'小罐'});
+      });
     });
   }
   scanPig(data.bigPigments.rows,'大倉'); scanPig(data.smallPigments.rows,'小倉');
@@ -460,9 +495,22 @@ function renderPigmentSection(containerId,pigData){
       var td0=document.createElement('td');td0.className='row-label';td0.textContent='大罐';tr.appendChild(td0);
       row.big.forEach(function(val,ci){
         var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
+        var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
         var inp=numInput(val,function(v,ov){row.big[ci]=v;cloudSave('bigPigments',data.bigPigments,'大倉色料 '+row.group+' '+row.codes[ci],ov);renderLowStock();});
-        if(parseFloat(val)===0) inp.style.color='var(--red)';
-        td.appendChild(inp);tr.appendChild(td);
+        if(!row.bigIgnore||!row.bigIgnore[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+        wrap.appendChild(inp);
+        var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
+        if(row.bigIgnore&&row.bigIgnore[ci]) ib.classList.add('active');
+        ib.addEventListener('click',function(){
+          if(!row.bigIgnore) row.bigIgnore=new Array(row.codes.length).fill(false);
+          row.bigIgnore[ci]=!row.bigIgnore[ci];
+          ib.classList.toggle('active',row.bigIgnore[ci]);
+          inp.style.color=row.bigIgnore[ci]?'var(--text-muted)':(parseFloat(row.big[ci])===0?'var(--red)':'');
+          cloudSave('bigPigments',data.bigPigments,'大倉色料忽略 '+row.codes[ci],'');
+          renderLowStock();
+        });
+        wrap.appendChild(ib);
+        td.appendChild(wrap);tr.appendChild(td);
       });
       tbody.appendChild(tr);
     }
@@ -470,9 +518,22 @@ function renderPigmentSection(containerId,pigData){
     var td00=document.createElement('td');td00.className='row-label';td00.textContent='小罐';tr2.appendChild(td00);
     row.small.forEach(function(val,ci){
       var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
+      var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
       var inp=numInput(val,function(v,ov){row.small[ci]=v;cloudSave('bigPigments',data.bigPigments,'大倉色料 '+row.group+' '+row.codes[ci],ov);renderLowStock();});
-      if(parseFloat(val)===0) inp.style.color='var(--red)';
-      td.appendChild(inp);tr2.appendChild(td);
+      if(!row.smallIgnore||!row.smallIgnore[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+      wrap.appendChild(inp);
+      var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
+      if(row.smallIgnore&&row.smallIgnore[ci]) ib.classList.add('active');
+      ib.addEventListener('click',function(){
+        if(!row.smallIgnore) row.smallIgnore=new Array(row.codes.length).fill(false);
+        row.smallIgnore[ci]=!row.smallIgnore[ci];
+        ib.classList.toggle('active',row.smallIgnore[ci]);
+        inp.style.color=row.smallIgnore[ci]?'var(--text-muted)':(parseFloat(row.small[ci])===0?'var(--red)':'');
+        cloudSave('bigPigments',data.bigPigments,'大倉色料忽略 '+row.codes[ci],'');
+        renderLowStock();
+      });
+      wrap.appendChild(ib);
+      td.appendChild(wrap);tr2.appendChild(td);
     });
     tbody.appendChild(tr2); tbl.appendChild(tbody); card.appendChild(tbl); container.appendChild(card);
   });
