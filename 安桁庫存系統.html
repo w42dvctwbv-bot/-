@@ -771,47 +771,35 @@ function initFirebaseAuth() {
         init();
       }
 
-      var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      // 檢查目前登入狀態（包含 redirect 後）
+      auth.onAuthStateChanged(function(user) {
+        if (!_entered) enterSystem(user);
+      });
 
-      if (isMobile) {
-        // 手機：處理 redirect 結果
-        document.getElementById('loginLoading').textContent = '處理中…';
-        auth.getRedirectResult().then(function(result) {
-          if (result && result.user) {
-            enterSystem(result.user);
-          } else {
-            document.getElementById('loginLoading').textContent = '';
-            auth.onAuthStateChanged(function(user) {
-              if (!_entered) enterSystem(user);
-            });
-          }
-        }).catch(function() {
-          document.getElementById('loginLoading').textContent = '';
-        });
-      } else {
-        // 桌機：直接看目前登入狀態
-        auth.onAuthStateChanged(function(user) {
-          if (!_entered) enterSystem(user);
-        });
-      }
-
-      // 登入按鈕
+      // 登入按鈕 — 全部用 popup
       document.getElementById('googleLoginBtn').addEventListener('click', function() {
         document.getElementById('loginErr').textContent = '';
+        document.getElementById('loginLoading').textContent = '登入中…';
         var provider = new firebase.auth.GoogleAuthProvider();
-        if (isMobile) {
-          document.getElementById('loginLoading').textContent = '跳轉中…';
-          auth.signInWithRedirect(provider);
-        } else {
-          document.getElementById('loginLoading').textContent = '登入中…';
-          auth.signInWithPopup(provider).then(function(result) {
-            enterSystem(result.user);
-          }).catch(function(err) {
-            document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
-            document.getElementById('loginLoading').textContent = '';
+        provider.setCustomParameters({ prompt: 'select_account' });
+        auth.signInWithPopup(provider)
+          .then(function(result) { enterSystem(result.user); })
+          .catch(function(err) {
+            if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+              // Popup 被擋，改用 redirect
+              document.getElementById('loginLoading').textContent = '跳轉中…';
+              auth.signInWithRedirect(provider);
+            } else {
+              document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
+              document.getElementById('loginLoading').textContent = '';
+            }
           });
-        }
       });
+
+      // 處理 redirect 回來的結果
+      auth.getRedirectResult().then(function(result) {
+        if (result && result.user) enterSystem(result.user);
+      }).catch(function(){});
     };
     document.head.appendChild(s2);
   };
