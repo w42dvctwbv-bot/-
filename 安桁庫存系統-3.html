@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>安桁庫存管理系統</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── 登入畫面 ── */
+#loginScreen{position:fixed;inset:0;background:#2a2118;display:flex;align-items:center;justify-content:center;z-index:9999;}
+#loginScreen.hidden{display:none;}
+.login-box{background:#f5f0e8;border-radius:8px;padding:40px 48px;text-align:center;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.login-box .logo{font-family:'DM Mono',monospace;font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:#8b5e3c;margin-bottom:6px;}
+.login-box h2{font-family:'DM Serif Display',serif;font-size:1.6rem;color:#2a2118;margin-bottom:8px;}
+.login-box p{font-size:0.78rem;color:#7a6a55;margin-bottom:28px;line-height:1.5;}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:12px 20px;background:#fff;border:1.5px solid #c8b89a;border-radius:4px;font-family:'Noto Sans TC',sans-serif;font-size:0.88rem;font-weight:500;color:#2a2118;cursor:pointer;transition:all 0.15s;}
+.google-btn:hover{background:#f5f0e8;border-color:#8b5e3c;}
+.google-btn svg{width:20px;height:20px;flex-shrink:0;}
+.login-err{margin-top:12px;font-size:0.75rem;color:#c0392b;font-family:'DM Mono',monospace;min-height:18px;}
+.login-loading{margin-top:12px;font-size:0.75rem;color:#7a6a55;font-family:'DM Mono',monospace;}
+
+:root{--bg:#f5f0e8;--bg2:#ede8dc;--panel:#faf7f2;--border:#c8b89a;--border-light:#ddd4c0;--accent:#8b5e3c;--accent2:#c4864e;--text:#2a2118;--text-muted:#7a6a55;--red:#c0392b;--green:#27715a;--yellow:#b8860b;--tag-bg:#e8dcc8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);}
+header{background:var(--text);color:var(--bg);padding:24px 32px 18px;display:flex;align-items:flex-end;gap:20px;border-bottom:3px solid var(--accent2);}
+header h1{font-family:'DM Serif Display',serif;font-size:1.8rem;line-height:1;}
+header .subtitle{font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--accent2);letter-spacing:0.16em;text-transform:uppercase;padding-bottom:2px;}
+header .editor-badge{display:flex;align-items:center;gap:8px;margin-left:auto;}
+header .editor-badge label{font-family:'DM Mono',monospace;font-size:0.62rem;color:#a09080;letter-spacing:0.1em;}
+header .editor-badge input{font-family:'DM Mono',monospace;font-size:0.7rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:var(--bg);padding:4px 10px;border-radius:3px;width:110px;}
+header .editor-badge input:focus{outline:none;border-color:var(--accent2);}
+.sync-bar{display:flex;align-items:center;gap:10px;padding:7px 32px;font-family:'DM Mono',monospace;font-size:0.67rem;background:var(--bg2);border-bottom:1px solid var(--border-light);color:var(--text-muted);}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background 0.3s;}
+.sync-dot.syncing{background:var(--yellow);animation:pulse 1s infinite;}
+.sync-dot.ok{background:var(--green);}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 32px;display:flex;overflow-x:auto;}
+nav button{font-family:'Noto Sans TC',sans-serif;font-size:0.76rem;font-weight:500;padding:12px 18px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.18s;white-space:nowrap;}
+nav button:hover{color:var(--accent);}
+nav button.active{color:var(--text);border-bottom-color:var(--accent);background:var(--panel);}
+main{padding:28px 32px;max-width:1400px;}
+.section{display:none;}.section.active{display:block;}
+.section-title{font-family:'DM Serif Display',serif;font-size:1.3rem;color:var(--accent);margin-bottom:18px;padding-bottom:8px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:12px;}
+.section-title .mono{font-family:'DM Mono',monospace;font-size:0.63rem;font-weight:400;color:var(--text-muted);letter-spacing:0.12em;text-transform:uppercase;border:1px solid var(--border);padding:2px 7px;border-radius:2px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:28px;}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+.table-card{background:var(--panel);border:1px solid var(--border-light);border-radius:4px;overflow:hidden;margin-bottom:24px;}
+.table-card-header{background:var(--tag-bg);padding:9px 14px;font-size:0.7rem;font-family:'DM Mono',monospace;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--border-light);}
+table{width:100%;border-collapse:collapse;font-size:0.81rem;}
+thead th{background:var(--bg2);padding:8px 12px;text-align:left;font-weight:500;font-size:0.7rem;letter-spacing:0.06em;color:var(--text-muted);border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;}
+tbody tr{border-bottom:1px solid var(--border-light);transition:background 0.12s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:rgba(139,94,60,0.04);}
+tbody td{padding:7px 12px;vertical-align:middle;}
+.name-cell{font-weight:500;color:var(--text);}
+.num-cell{font-family:'DM Mono',monospace;font-size:0.81rem;text-align:center;}
+.num-cell input{width:56px;text-align:center;font-family:'DM Mono',monospace;font-size:0.81rem;border:1px solid transparent;background:transparent;padding:3px 5px;border-radius:3px;color:var(--text);transition:all 0.15s;}
+.num-cell input:hover{border-color:var(--border);background:var(--bg);}
+.num-cell input:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 2px rgba(139,94,60,0.12);}
+.note-cell input{width:100%;font-family:'Noto Sans TC',sans-serif;font-size:0.76rem;border:1px solid transparent;background:transparent;padding:3px 5px;border-radius:3px;color:var(--text-muted);transition:all 0.15s;}
+.note-cell input:hover{border-color:var(--border);background:var(--bg);}
+.note-cell input:focus{outline:none;border-color:var(--accent);background:#fff;}
+.brand-group-row td{background:var(--tag-bg);font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);padding:7px 14px;border-top:2px solid var(--border);}
+/* 不追蹤核取方塊 */
+.ignore-cell{text-align:center;width:36px;}
+.ignore-cell input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+.ignored-row{opacity:0.45;}
+.ignored-row .name-cell::after{content:' ·不追蹤';font-size:0.65rem;color:var(--text-muted);font-family:'DM Mono',monospace;font-weight:400;}
+/* 色料不追蹤按鈕 */
+.pig-ignore{font-size:0.6rem;font-family:'DM Mono',monospace;cursor:pointer;color:var(--text-muted);background:none;border:1px solid var(--border-light);border-radius:2px;padding:1px 4px;margin-left:3px;vertical-align:middle;}
+.pig-ignore.active{color:var(--accent);border-color:var(--accent);background:var(--tag-bg);}
+.status-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:0.63rem;font-weight:600;padding:2px 7px;border-radius:2px;white-space:nowrap;}
+.status-badge.empty{background:rgba(192,57,43,0.1);color:var(--red);}
+.status-badge.low{background:rgba(184,134,11,0.12);color:var(--yellow);}
+.status-badge.ok{background:rgba(39,113,90,0.1);color:var(--green);}
+.alert-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;}
+@media(max-width:800px){.alert-grid{grid-template-columns:1fr;}}
+.alert-box{background:#fff8f0;border:1.5px solid var(--accent2);border-left:4px solid var(--red);border-radius:4px;padding:14px 18px;}
+.alert-box-title{font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--red);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.count-badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 8px;font-size:0.68rem;}
+.alert-items{display:flex;flex-wrap:wrap;gap:7px;}
+.alert-item{background:#fff;border:1px solid #f0c8b0;border-radius:3px;padding:5px 10px;font-size:0.76rem;display:flex;align-items:center;gap:7px;}
+.ai-name{font-weight:500;color:var(--text);}
+.ai-qty{font-family:'DM Mono',monospace;font-size:0.73rem;font-weight:600;color:var(--red);}
+.ai-section{font-family:'DM Mono',monospace;font-size:0.63rem;color:var(--text-muted);background:var(--bg2);padding:1px 5px;border-radius:2px;}
+.no-alert{background:#f0faf5;border:1px solid #a8d8c0;border-left:4px solid var(--green);border-radius:4px;padding:11px 16px;font-size:0.78rem;color:var(--green);font-weight:500;}
+.color-grid-table th.color-code{font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;color:var(--accent);background:var(--tag-bg);border:1px solid var(--border-light);text-align:center;}
+.color-grid-table td{border:1px solid var(--border-light);text-align:center;padding:6px 8px;}
+.color-grid-table .row-label{font-size:0.7rem;color:var(--text-muted);font-family:'DM Mono',monospace;white-space:nowrap;background:var(--bg2);font-weight:500;text-align:left;padding-left:12px;}
+.sub-section{margin-bottom:24px;}
+.sub-section h3{font-size:0.76rem;font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px;}
+.btn{font-family:'DM Mono',monospace;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 14px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;border-radius:2px;transition:all 0.15s;margin-left:8px;}
+.btn:hover{background:var(--tag-bg);border-color:var(--accent);}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn.primary:hover{background:#7a5234;}
+.toolbar{display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px;gap:4px;}
+.ignored-row{opacity:0.38;}
+.ignore-cell{text-align:center;width:52px;}
+.ignore-cell input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+.pig-ignore{font-size:0.65rem;background:none;border:1px solid var(--border-light);border-radius:3px;cursor:pointer;padding:1px 3px;opacity:0.35;line-height:1;transition:all 0.15s;}
+.pig-ignore:hover{opacity:0.8;}
+.pig-ignore.active{opacity:1;background:var(--tag-bg);border-color:var(--accent);}
+.log-table td{padding:6px 12px;}
+.log-time{font-family:'DM Mono',monospace;font-size:0.67rem;color:var(--text-muted);white-space:nowrap;}
+.log-editor{font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:600;color:var(--accent);}
+.log-field{color:var(--text);font-weight:500;}
+.log-old{color:var(--text-muted);text-decoration:line-through;font-family:'DM Mono',monospace;}
+.log-new{color:var(--green);font-family:'DM Mono',monospace;font-weight:600;}
+footer{margin-top:36px;padding:18px 32px;border-top:1px solid var(--border-light);font-family:'DM Mono',monospace;font-size:0.63rem;color:var(--text-muted);letter-spacing:0.08em;display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+
+<!-- Google 登入畫面 -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="logo">Giorgio Graesan · 安桁</div>
+    <h2>庫存管理系統</h2>
+    <p>請使用公司 Google 帳號登入</p>
+    <button class="google-btn" id="googleLoginBtn">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      使用 Google 帳號登入
+    </button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-loading" id="loginLoading"></div>
+  </div>
+</div>
+<header>
+  <div>
+    <div class="subtitle">Giorgio Graesan · 安桁</div>
+    <h1>庫存管理系統</h1>
+  </div>
+  <div class="editor-badge">
+    <label>編輯者</label>
+    <input type="text" id="editorName" placeholder="輸入名字…" maxlength="20">
+  </div>
+</header>
+<div class="sync-bar">
+  <div class="sync-dot" id="syncDot"></div>
+  <span id="syncStatus">正在連線…</span>
+  <span style="margin-left:auto;opacity:0.6;" id="syncTime"></span>
+</div>
+<nav>
+  <button class="active" data-section="overview">📊 總覽</button>
+  <button data-section="products">🪣 塗料產品</button>
+  <button data-section="pigments">🎨 色料</button>
+  <button data-section="tools">🔧 工具</button>
+  <button data-section="panels">🗄️ 薄板</button>
+  <button data-section="catalogs">📚 型錄</button>
+  <button data-section="logs">📋 編輯紀錄</button>
+</nav>
+<main>
+<div class="section active" id="overview">
+  <div class="section-title">總覽 <span class="mono">Overview</span></div>
+  <div class="toolbar">
+    <button class="btn" id="printBtn">列印</button>
+    <button class="btn primary" id="exportBtn">匯出 CSV</button>
+  </div>
+  <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:16px;">點擊任何數字可直接編輯。所有更改自動同步到雲端。</p>
+  <div class="alert-grid">
+    <div id="lowStockPaint"></div>
+    <div id="lowStockPigment"></div>
+  </div>
+  <div class="sub-section">
+    <h3>所有塗料產品庫存</h3>
+    <div class="table-card">
+      <table id="overviewTable">
+        <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th><th class="ignore-cell" title="不追蹤警示">🔕</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="section" id="products">
+  <div class="section-title">所有塗料產品庫存 <span class="mono">Paint Products</span></div>
+  <div class="table-card">
+    <table id="allProductsTable">
+      <thead><tr><th>產品名稱</th><th class="num-cell">大倉</th><th class="num-cell">小倉</th><th class="num-cell">需叫貨數</th><th>狀態</th><th>備註</th><th class="ignore-cell" title="不追蹤警示">🔕</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+<div class="section" id="pigments">
+  <div class="section-title">色料庫存 <span class="mono">Pigments</span></div>
+  <div class="grid-2">
+    <div><div class="sub-section"><h3>大倉庫 色料</h3><div id="bigPigmentTables"></div></div></div>
+    <div><div class="sub-section"><h3>小倉庫 色料</h3><div id="smallPigmentTables"></div></div></div>
+  </div>
+</div>
+<div class="section" id="tools">
+  <div class="section-title">工具庫存 <span class="mono">Tools</span></div>
+  <div class="grid-2">
+    <div>
+      <div class="sub-section"><h3>大倉 — Giorgio Graesan</h3><div class="table-card" id="bigToolGG"></div></div>
+      <div class="sub-section"><h3>大倉 — Stucco Italiano</h3><div class="table-card" id="bigToolSI"></div></div>
+    </div>
+    <div>
+      <div class="sub-section"><h3>小倉 — Giorgio Graesan</h3><div class="table-card" id="smallToolGG"></div></div>
+      <div class="sub-section"><h3>小倉 — Stucco Italiano</h3><div class="table-card" id="smallToolSI"></div></div>
+    </div>
+  </div>
+</div>
+<div class="section" id="panels">
+  <div class="section-title">薄板庫存 <span class="mono">Panels</span></div>
+  <div class="table-card">
+    <table id="panelTable">
+      <thead><tr><th>型號</th><th class="num-cell">數量</th><th>備註</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+<div class="section" id="catalogs">
+  <div class="section-title">型錄庫存 <span class="mono">Catalogs</span></div>
+  <div class="table-card">
+    <table id="catalogTable">
+      <thead><tr><th>型錄名稱</th><th class="num-cell">套數/本數</th><th>備註</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+<div class="section" id="logs">
+  <div class="section-title">編輯紀錄 <span class="mono">Edit History</span></div>
+  <div class="toolbar"><button class="btn primary" id="logsRefreshBtn">重新整理</button></div>
+  <div class="table-card">
+    <table class="log-table" id="logTable">
+      <thead><tr><th>時間</th><th>編輯者</th><th>欄位</th><th>舊值</th><th>新值</th></tr></thead>
+      <tbody><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:18px;">點擊「重新整理」載入紀錄</td></tr></tbody>
+    </table>
+  </div>
+</div>
+</main>
+<footer>
+  <span>Giorgio Graesan · 安桁庫存系統</span>
+  <span id="footerDate"></span>
+  <span style="opacity:0.4;">v20260507</span>
+</footer>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbzTyPzQqqOqHlNIm-l6S3fLcc7D4yCM5LrA5mFxb7VaXmh157XD12v05Vldlz4hB6y0/exec';
+const LS_KEY = 'anHengInventory_v5';
+const POLL_MS = 20000;
+
+// ── DEFAULT DATA ──────────────────────────────────────
+const defaultData = {
+  orderItems:[
+    {brand:'GG',name:'Gioia',big:5,small:5,order:'',note:''},{brand:'GG',name:'Minimal',big:2,small:3,order:'',note:''},{brand:'GG',name:'Filideseta',big:10,small:5,order:'',note:''},{brand:'GG',name:'White paint',big:0,small:3,order:'',note:''},{brand:'GG',name:'Via lattes',big:7,small:5,order:'',note:''},{brand:'GG',name:'Sogni',big:8,small:1,order:'',note:''},{brand:'GG',name:'Primos sabbia',big:29,small:6,order:'',note:''},{brand:'GG',name:'Istinto',big:0,small:1,order:'',note:''},{brand:'GG',name:'Istinto 24kg',big:18,small:1,order:'',note:''},{brand:'GG',name:'Marmorino /8kg',big:0,small:0,order:'',note:''},{brand:'GG',name:'Marmorino /24kg',big:30,small:1,order:'',note:''},{brand:'GG',name:'Stuhhi',big:11,small:3,order:'',note:''},{brand:'GG',name:'Munro',big:22,small:3,order:'',note:''},{brand:'GG',name:'Primos nature',big:21,small:3,order:'',note:''},{brand:'GG',name:'Vetro Lucio',big:0,small:'2.6罐',order:'',note:''},{brand:'GG',name:'Cera',big:3,small:2,order:'',note:''},{brand:'GG',name:'Opaco',big:0,small:1,order:'',note:''},{brand:'GG',name:'Satinato',big:0,small:1,order:'',note:''},{brand:'GG',name:'Oro ricco',big:2,small:1,order:'',note:''},{brand:'GG',name:'Argento',big:'',small:'2.4',order:'',note:''},{brand:'GG',name:'Ventventi 0.5',big:56,small:5,order:'',note:''},{brand:'GG',name:'Ventventi 0.7',big:48,small:5,order:'',note:''},{brand:'GG',name:'Calchera San Giorgio',big:33,small:2,order:'',note:''},{brand:'GG',name:'Euphoria',big:5,small:1,order:'',note:''},{brand:'GG',name:'Natural beeswax',big:9,small:4,order:'',note:''},{brand:'GG',name:'Beeswax metallic gold',big:5,small:'',order:'',note:''},{brand:'GG',name:'Pearl cream gold',big:8,small:'',order:'',note:''},
+    {brand:'SI',name:'Pastellone M',big:2,small:2,order:'',note:''},{brand:'SI',name:'Pastellone Fine',big:9,small:2,order:'',note:''},{brand:'SI',name:'Petrie Siena',big:5,small:1,order:'',note:''},{brand:'SI',name:'Petrae Vicenza',big:5,small:1,order:'',note:''},{brand:'SI',name:'Marmorino velvet',big:10,small:1,order:'',note:''},{brand:'SI',name:'Seta plaster',big:8,small:1,order:'',note:''},{brand:'SI',name:'Lava plaster',big:1,small:1,order:'',note:''},{brand:'SI',name:'Nappa',big:0,small:2,order:'',note:''},{brand:'SI',name:'Quartz primer',big:16,small:3,order:'',note:''},{brand:'SI',name:'Primer 4',big:0,small:2,order:'',note:''},{brand:'SI',name:'Base for furniture',big:5,small:1,order:'',note:''}
+  ],
+  bigPigments:{rows:[
+    {group:'G',codes:['GE','GG','GF','GD','GB','GA','GC'],big:[6,3,3,6,9,6,3],small:[0,3,0,0,0,0,0]},
+    {group:'K',codes:['KB','KA','KF','KC','KD','KG','KE'],big:[0,0,0,0,0,6,0],small:[3,3,4,3,0,3,3]},
+    {group:'Z',codes:['ZA','ZB','ZC','ZD','ZE','ZF','ZG'],big:null,small:[0,3,2,3,3,3,9]},
+    {group:'A',codes:['AR','AA','AL','AM','AF','AV','AZ'],big:null,small:[3,3,3,0,3,0,3]},
+    {group:'N',codes:['NA','NB','NS','NL','NR','NO','NY'],big:[9,9,0,6,0,0,0],small:[3,0,3,0,9,3,3]},
+    {group:'S',codes:['SC','SB','SD','SE','SA','SV','SG'],big:[3,6,0,0,0,0,0],small:[0,0,0,3,3,6,3]}
+  ]},
+  smallPigments:{rows:[
+    {group:'G',codes:['GE','GG','GF','GD','GB','GA','GC'],big:[2,4,5,3,2,2,3],small:[1,0,0,0,2,3,1]},
+    {group:'K',codes:['KB','KA','KF','KC','KD','KG','KE'],big:[0,0,0,0,0,2,0],small:[2,2,1,2,3,1,2]},
+    {group:'Z',codes:['ZA','ZB','ZC','ZD','ZE','ZF','ZG'],big:null,small:[4,1,3,1,2,3,1]},
+    {group:'A',codes:['AR','AA','AL','AM','AF','AV','AZ'],big:null,small:[1,3,1,5,2,3,2]},
+    {group:'N',codes:['NA','NB','NS','NL','NR','NO','NY'],big:[1,0,4,0,0,0,0],small:[0,0,1,0,1,3,2]},
+    {group:'S',codes:['SC','SB','SD','SE','SA','SV','SG'],big:[3,2,0,0,0,0,0],small:[1,0,7,0,1,3,2]}
+  ]},
+  bigToolsGG:[{name:'大曼刀',qty:0,note:''},{name:'鋸齒大曼刀',qty:2,note:''},{name:'草刷',qty:2,note:''},{name:'鋸齒刮刀',qty:3,note:''},{name:'大排刷',qty:6,note:''},{name:'羊毛手套',qty:13,note:''},{name:'皮革滾筒',qty:2,note:''},{name:'噴水器',qty:5,note:''},{name:'波浪曼刀',qty:2,note:''}],
+  bigToolsSI:[{name:'鈦合金大鏝刀 280x120mm',qty:2,note:''},{name:'鈦合金小鏝刀 100x240mm',qty:1,note:''},{name:'塑膠曼刀 280x130x2.5mm',qty:2,note:''},{name:'白海綿拍',qty:6,note:''},{name:'方形排刷',qty:6,note:''},{name:'厚刷',qty:2,note:''}],
+  smallToolsGG:[{name:'大曼刀',qty:'3新3舊',note:''},{name:'鋸齒大曼刀',qty:'1新3舊',note:''},{name:'草刷',qty:3,note:''},{name:'鋸齒刮刀',qty:2,note:''},{name:'大排刷',qty:5,note:''},{name:'羊毛手套',qty:3,note:''},{name:'噴水器',qty:3,note:''},{name:'波浪曼刀',qty:1,note:''}],
+  smallToolsSI:[{name:'鈦合金大鏝刀 280x120mm',qty:4,note:''},{name:'鈦合金小鏝刀 100x240mm',qty:5,note:''},{name:'塑膠曼刀 280x130x2.5mm',qty:4,note:''},{name:'小鏝刀 80x200x0.6mm',qty:4,note:''},{name:'三角鏝刀 240x120x0.6mm',qty:3,note:''},{name:'白海綿拍',qty:4,note:''},{name:'方形刷子',qty:3,note:''},{name:'厚刷',qty:3,note:''},{name:'鑽石打磨塊',qty:3,note:''}],
+  panels:[{name:'Blade',qty:2,note:''},{name:'Context',qty:3,note:''},{name:'Eternity',qty:7,note:''},{name:'Experience',qty:0,note:''},{name:'Must',qty:3,note:''},{name:'Prime stone',qty:2,note:''},{name:'Trilogy',qty:7,note:''},{name:'Urbanature',qty:0,note:''}],
+  catalogs:[{name:'Gioia',qty:9,note:'套'},{name:'Sogni',qty:3,note:'套'},{name:'Minimal',qty:10,note:'套'},{name:'Filideseta',qty:3,note:'套'},{name:'Via letters',qty:2,note:'套'},{name:'White paint',qty:3,note:'本'},{name:'Giorgio Graesan',qty:0,note:'套'},{name:'Istinto',qty:7,note:'套'},{name:'Muro',qty:6,note:'套'},{name:'Stucchi',qty:6,note:'套'},{name:'Marmorino 白',qty:0,note:''},{name:'Marmorino 咖啡',qty:6,note:'套'},{name:'Morbido tocco',qty:1,note:'套'}]
+};
+
+let data = JSON.parse(JSON.stringify(defaultData));
+function saveLocal(){localStorage.setItem(LS_KEY,JSON.stringify(data));}
+function getEditor(){return document.getElementById('editorName').value.trim()||'匿名';}
+
+// ── SYNC UI ──────────────────────────────────────────
+function setSyncStatus(state,msg,time){
+  document.getElementById('syncDot').className='sync-dot '+state;
+  document.getElementById('syncStatus').textContent=msg;
+  if(time) document.getElementById('syncTime').textContent='上次同步：'+time;
+}
+
+// ── JSONP cloud GET ───────────────────────────────────
+function cloudGet(){
+  setSyncStatus('syncing','同步中…');
+  return new Promise(function(resolve){
+    var cbName='_gs'+Date.now();
+    var timer=setTimeout(function(){
+      delete window[cbName];
+      setSyncStatus('error','連線逾時');
+      resolve(null);
+    },15000);
+    window[cbName]=function(resp){
+      clearTimeout(timer);
+      delete window[cbName];
+      if(resp&&resp.ok){
+        setSyncStatus('ok','已同步',new Date().toLocaleTimeString('zh-TW'));
+        resolve(resp.data||{});
+      } else {
+        setSyncStatus('error',(resp&&resp.error)||'回應錯誤');
+        resolve(null);
+      }
+    };
+    var s=document.createElement('script');
+    s.src=API_URL+'?action=getData&callback='+cbName+'&t='+Date.now();
+    s.onerror=function(){clearTimeout(timer);delete window[cbName];setSyncStatus('error','Script載入失敗');resolve(null);};
+    document.head.appendChild(s);
+  });
+}
+
+// ── cloud POST ────────────────────────────────────────
+function cloudSave(key,value,label,oldVal){
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveData',key:key,value:value,editor:getEditor(),fieldLabel:label,oldValue:oldVal})}).catch(function(){});
+}
+function cloudSaveAll(){
+  setSyncStatus('syncing','上傳中…');
+  fetch(API_URL,{method:'POST',body:JSON.stringify({action:'saveAll',dataObj:data,editor:getEditor()})})
+    .then(function(){setSyncStatus('ok','已同步',new Date().toLocaleTimeString('zh-TW'));})
+    .catch(function(){setSyncStatus('error','上傳失敗');});
+}
+
+// ── merge cloud data ──────────────────────────────────
+var lastLocalEdit = 0;
+
+function mergeCloud(cd){
+  if(!cd) return false;
+  if(Date.now() - lastLocalEdit < 120000) return false;
+  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs','pigIgnore'];
+  var changed=false;
+  keys.forEach(function(k){
+    if(cd[k]!==undefined&&JSON.stringify(cd[k])!==JSON.stringify(data[k])){
+      data[k]=cd[k]; changed=true;
+    }
+  });
+  return changed;
+}
+
+// ── poll ─────────────────────────────────────────────
+function pollCloud(){
+  cloudGet().then(function(cd){
+    if(cd&&Object.keys(cd).length>0){
+      var changed=mergeCloud(cd);
+      if(changed){saveLocal();renderAll();}
+    }
+  });
+}
+
+// ── INPUT HELPERS ─────────────────────────────────────
+function numInput(val,onChange){
+  var inp=document.createElement('input');
+  inp.type='text'; inp.value=val||'';
+  var old=val||'';
+  inp.addEventListener('focus',function(){old=inp.value;});
+  inp.addEventListener('change',function(){
+    lastLocalEdit=Date.now(); // 記錄本地編輯時間
+    onChange(inp.value,old); old=inp.value; saveLocal();
+  });
+  return inp;
+}
+function textInput(val,onChange){
+  var inp=document.createElement('input');
+  inp.type='text'; inp.value=val||''; inp.placeholder='備註…';
+  inp.addEventListener('change',function(){
+    lastLocalEdit=Date.now();
+    onChange(inp.value);saveLocal();
+  });
+  return inp;
+}
+
+// ── STATUS BADGE ──────────────────────────────────────
+function makeBadge(val){
+  var n=parseFloat(val);
+  if(isNaN(n)||val==='') return document.createTextNode('');
+  var span=document.createElement('span');
+  if(n===0){span.className='status-badge empty';span.textContent='缺貨';}
+  else if(n<5){span.className='status-badge low';span.textContent='庫存低';}
+  else{span.className='status-badge ok';span.textContent='正常';}
+  return span;
+}
+
+// ── PRODUCTS ──────────────────────────────────────────
+var BRANDS={GG:'Giorgio Graesan',SI:'Stucco Italiano'};
+function sortedItems(){
+  return data.orderItems.filter(function(i){return (i.brand||'GG')==='GG';})
+    .concat(data.orderItems.filter(function(i){return (i.brand||'GG')==='SI';}));
+}
+function buildProductRows(tbody,items){
+  tbody.innerHTML='';
+  var lastBrand=null;
+  items.forEach(function(item){
+    var brand=item.brand||'GG';
+    if(brand!==lastBrand){
+      lastBrand=brand;
+      var gtr=document.createElement('tr'); gtr.className='brand-group-row';
+      var gtd=document.createElement('td'); gtd.colSpan=7; gtd.textContent=BRANDS[brand]||brand;
+      gtr.appendChild(gtd); tbody.appendChild(gtr);
+    }
+    var tr=document.createElement('tr');
+    if(item.ignore) tr.classList.add('ignored-row');
+    var bn=parseFloat(item.big);
+    if(!item.ignore&&!isNaN(bn)&&bn<5) tr.style.background=bn===0?'rgba(192,57,43,0.05)':'rgba(184,134,11,0.04)';
+
+    var tdN=document.createElement('td'); tdN.className='name-cell'; tdN.textContent=item.name; tr.appendChild(tdN);
+
+    var tdB=document.createElement('td'); tdB.className='num-cell';
+    var inB=numInput(item.big,function(v,ov){item.big=v;cloudSave('orderItems',data.orderItems,item.name+' 大倉',ov);renderLowStock();});
+    if(!item.ignore&&!isNaN(bn)&&bn<5) inB.style.color=bn===0?'var(--red)':'var(--yellow)';
+    tdB.appendChild(inB); tr.appendChild(tdB);
+
+    var tdS=document.createElement('td'); tdS.className='num-cell';
+    tdS.appendChild(numInput(item.small,function(v,ov){item.small=v;cloudSave('orderItems',data.orderItems,item.name+' 小倉',ov);}));
+    tr.appendChild(tdS);
+
+    var tdO=document.createElement('td'); tdO.className='num-cell';
+    if(item.order===undefined) item.order='';
+    var inO=numInput(item.order,function(v,ov){item.order=v;cloudSave('orderItems',data.orderItems,item.name+' 叫貨數',ov);});
+    if(!item.ignore&&item.order&&parseFloat(item.order)>0){inO.style.color='var(--yellow)';inO.style.fontWeight='600';tr.style.background='rgba(184,134,11,0.06)';}
+    tdO.appendChild(inO); tr.appendChild(tdO);
+
+    var tdSt=document.createElement('td'); tdSt.appendChild(item.ignore?document.createTextNode(''):makeBadge(item.big)); tr.appendChild(tdSt);
+
+    var tdNt=document.createElement('td'); tdNt.className='note-cell';
+    tdNt.appendChild(textInput(item.note,function(v){item.note=v;cloudSave('orderItems',data.orderItems,item.name+' 備註','');}));
+    tr.appendChild(tdNt);
+
+    // 🔕 不追蹤核取方塊
+    var tdI=document.createElement('td'); tdI.className='ignore-cell';
+    var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!item.ignore;
+    cb.title='勾選後不顯示在警示';
+    cb.addEventListener('change',function(){
+      item.ignore=cb.checked;
+      if(cb.checked){tr.classList.add('ignored-row');tr.style.background='';}
+      else{tr.classList.remove('ignored-row');}
+      cloudSave('orderItems',data.orderItems,item.name+' 不追蹤',!cb.checked);
+      renderLowStock();
+    });
+    tdI.appendChild(cb); tr.appendChild(tdI);
+    tbody.appendChild(tr);
+  });
+}
+function renderOverview(){var t=document.querySelector('#overviewTable tbody');if(t) buildProductRows(t,sortedItems());}
+function renderAllProductsTable(){var t=document.querySelector('#allProductsTable tbody');if(t) buildProductRows(t,sortedItems());}
+
+// ── LOW STOCK ─────────────────────────────────────────
+function makeAlertBox(id,title,alerts,threshold){
+  var c=document.getElementById(id); c.innerHTML='';
+  if(alerts.length===0){
+    var d=document.createElement('div'); d.className='no-alert';
+    d.innerHTML='<strong>'+title+'</strong><br>✓ 庫存正常';
+    c.appendChild(d); return;
+  }
+  var box=document.createElement('div'); box.className='alert-box';
+  var hd=document.createElement('div'); hd.className='alert-box-title';
+  hd.innerHTML='⚠ '+title+' <span class="count-badge">'+alerts.length+'</span>';
+  box.appendChild(hd);
+  var list=document.createElement('div'); list.className='alert-items';
+  alerts.forEach(function(a){
+    var chip=document.createElement('div'); chip.className='alert-item';
+    chip.innerHTML='<span class="ai-section">'+a.section+'</span><span class="ai-name">'+a.name+'</span><span class="ai-qty">'+(a.qty===0||a.qty==='0'?'缺貨':String(a.qty))+'</span>';
+    list.appendChild(chip);
+  });
+  box.appendChild(list); c.appendChild(box);
+}
+function renderLowStock(){
+  var LOW=5;
+  var pa=[];
+  data.orderItems.forEach(function(i){
+    if(i.ignore) return;
+    var n=parseFloat(i.big);
+    if(!isNaN(n)&&n<LOW) pa.push({name:i.name,qty:i.big,section:i.brand==='SI'?'Stucco':'GG'});
+  });
+  makeAlertBox('lowStockPaint','藝術塗料警示',pa,LOW);
+
+  if(!data.pigIgnore) data.pigIgnore={};
+  var pia=[];
+  function scanPig(rows,label,containerPrefix){
+    rows.forEach(function(row){
+      var ignoreKey=containerPrefix+'_'+row.group;
+      var ig=data.pigIgnore[ignoreKey]||{big:[],small:[]};
+      if(row.big) row.codes.forEach(function(c,ci){
+        if(ig.big[ci]) return;
+        if(parseFloat(row.big[ci])===0) pia.push({name:c,qty:0,section:label+'大罐'});
+      });
+      row.codes.forEach(function(c,ci){
+        if(ig.small[ci]) return;
+        if(parseFloat(row.small[ci])===0) pia.push({name:c,qty:0,section:label+'小罐'});
+      });
+    });
+  }
+  scanPig(data.bigPigments.rows,'大倉','bigPigmentTables');
+  scanPig(data.smallPigments.rows,'小倉','smallPigmentTables');
+  makeAlertBox('lowStockPigment','色料缺貨警示',pia,1);
+}
+
+// ── PIGMENTS ──────────────────────────────────────────
+function renderPigmentSection(containerId,pigData){
+  var container=document.getElementById(containerId); container.innerHTML='';
+  pigData.rows.forEach(function(row){
+    var card=document.createElement('div'); card.className='table-card'; card.style.marginBottom='14px';
+    var hdr=document.createElement('div'); hdr.className='table-card-header'; hdr.textContent='系列 '+row.group; card.appendChild(hdr);
+    var tbl=document.createElement('table'); tbl.className='color-grid-table'; tbl.style.width='100%';
+    var thead=document.createElement('thead'); var hr=document.createElement('tr');
+    var th0=document.createElement('th'); th0.style.cssText='background:var(--bg2);border:1px solid var(--border-light);padding:5px 8px;font-size:0.63rem;'; hr.appendChild(th0);
+    row.codes.forEach(function(code){var th=document.createElement('th');th.className='color-code';th.textContent=code;th.style.padding='5px 7px';hr.appendChild(th);});
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tbody=document.createElement('tbody');
+
+    // 從獨立的 pigIgnore 物件讀取 ignore 狀態
+    var ignoreKey = containerId + '_' + row.group;
+    if(!data.pigIgnore) data.pigIgnore={};
+    if(!data.pigIgnore[ignoreKey]) data.pigIgnore[ignoreKey]={big:[],small:[]};
+    var ignoreState = data.pigIgnore[ignoreKey];
+
+    if(row.big){
+      var tr=document.createElement('tr');
+      var td0=document.createElement('td');td0.className='row-label';td0.textContent='大罐';tr.appendChild(td0);
+      row.big.forEach(function(val,ci){
+        var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
+        var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
+        var inp=numInput(val,function(v,ov){row.big[ci]=v;cloudSave(containerId==='bigPigmentTables'?'bigPigments':'smallPigments',containerId==='bigPigmentTables'?data.bigPigments:data.smallPigments,'色料 '+row.group+' 大罐 '+row.codes[ci],ov);renderLowStock();});
+        if(!ignoreState.big[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+        wrap.appendChild(inp);
+        var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
+        if(ignoreState.big[ci]) ib.classList.add('active');
+        ib.addEventListener('click',function(){
+          ignoreState.big[ci]=!ignoreState.big[ci];
+          ib.classList.toggle('active',ignoreState.big[ci]);
+          inp.style.color=ignoreState.big[ci]?'var(--text-muted)':(parseFloat(row.big[ci])===0?'var(--red)':'');
+          cloudSave('pigIgnore',data.pigIgnore,'色料不追蹤 '+row.group+' 大罐 '+row.codes[ci],'');
+          renderLowStock();
+        });
+        wrap.appendChild(ib);
+        td.appendChild(wrap);tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    var tr2=document.createElement('tr');
+    var td00=document.createElement('td');td00.className='row-label';td00.textContent='小罐';tr2.appendChild(td00);
+    row.small.forEach(function(val,ci){
+      var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
+      var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
+      var inp=numInput(val,function(v,ov){row.small[ci]=v;cloudSave(containerId==='bigPigmentTables'?'bigPigments':'smallPigments',containerId==='bigPigmentTables'?data.bigPigments:data.smallPigments,'色料 '+row.group+' 小罐 '+row.codes[ci],ov);renderLowStock();});
+      if(!ignoreState.small[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+      wrap.appendChild(inp);
+      var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
+      if(ignoreState.small[ci]) ib.classList.add('active');
+      ib.addEventListener('click',function(){
+        ignoreState.small[ci]=!ignoreState.small[ci];
+        ib.classList.toggle('active',ignoreState.small[ci]);
+        inp.style.color=ignoreState.small[ci]?'var(--text-muted)':(parseFloat(row.small[ci])===0?'var(--red)':'');
+        cloudSave('pigIgnore',data.pigIgnore,'色料不追蹤 '+row.group+' 小罐 '+row.codes[ci],'');
+        renderLowStock();
+      });
+      wrap.appendChild(ib);
+      td.appendChild(wrap);tr2.appendChild(td);
+    });
+    tbody.appendChild(tr2); tbl.appendChild(tbody); card.appendChild(tbl); container.appendChild(card);
+  });
+}
+
+// ── TOOLS ─────────────────────────────────────────────
+function renderToolsTable(containerId,tools,cloudKey){
+  var c=document.getElementById(containerId); c.innerHTML='';
+  var tbl=document.createElement('table');
+  var thead=document.createElement('thead'); thead.innerHTML='<tr><th>工具名稱</th><th class="num-cell">數量</th><th>備註</th></tr>'; tbl.appendChild(thead);
+  var tbody=document.createElement('tbody');
+  tools.forEach(function(tool){
+    var tr=document.createElement('tr');
+    var tdN=document.createElement('td');tdN.className='name-cell';tdN.textContent=tool.name;tr.appendChild(tdN);
+    var tdQ=document.createElement('td');tdQ.className='num-cell';
+    tdQ.appendChild(numInput(tool.qty,function(v,ov){tool.qty=v;cloudSave(cloudKey,data[cloudKey],'工具 '+tool.name,ov);}));
+    tr.appendChild(tdQ);
+    var tdNt=document.createElement('td');tdNt.className='note-cell';
+    tdNt.appendChild(textInput(tool.note,function(v){tool.note=v;}));
+    tr.appendChild(tdNt); tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody); c.appendChild(tbl);
+}
+
+// ── PANELS ────────────────────────────────────────────
+function renderPanelTable(){
+  var tbody=document.querySelector('#panelTable tbody'); tbody.innerHTML='';
+  data.panels.forEach(function(item){
+    var tr=document.createElement('tr');
+    var tdN=document.createElement('td');tdN.className='name-cell';tdN.textContent=item.name;tr.appendChild(tdN);
+    var tdQ=document.createElement('td');tdQ.className='num-cell';
+    var inp=numInput(item.qty,function(v,ov){item.qty=v;cloudSave('panels',data.panels,'薄板 '+item.name,ov);});
+    if(parseFloat(item.qty)===0) inp.style.color='var(--red)';
+    tdQ.appendChild(inp);tr.appendChild(tdQ);
+    var tdNt=document.createElement('td');tdNt.className='note-cell';
+    tdNt.appendChild(textInput(item.note,function(v){item.note=v;}));
+    tr.appendChild(tdNt); tbody.appendChild(tr);
+  });
+}
+
+// ── CATALOGS ──────────────────────────────────────────
+function renderCatalogTable(){
+  var tbody=document.querySelector('#catalogTable tbody'); tbody.innerHTML='';
+  data.catalogs.forEach(function(item){
+    var tr=document.createElement('tr');
+    var tdN=document.createElement('td');tdN.className='name-cell';tdN.textContent=item.name;tr.appendChild(tdN);
+    var tdQ=document.createElement('td');tdQ.className='num-cell';
+    var inp=numInput(item.qty,function(v,ov){item.qty=v;cloudSave('catalogs',data.catalogs,'型錄 '+item.name,ov);});
+    if(parseFloat(item.qty)===0) inp.style.color='var(--red)';
+    tdQ.appendChild(inp);tr.appendChild(tdQ);
+    var tdNt=document.createElement('td');tdNt.textContent=item.note;tr.appendChild(tdNt);
+    tbody.appendChild(tr);
+  });
+}
+
+// ── LOGS ──────────────────────────────────────────────
+function loadLogs(){
+  var tbody=document.querySelector('#logTable tbody');
+  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-muted)">載入中…</td></tr>';
+  var cbName='_log'+Date.now();
+  var timer=setTimeout(function(){delete window[cbName];tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--red)">載入逾時</td></tr>';},12000);
+  window[cbName]=function(resp){
+    clearTimeout(timer);delete window[cbName];
+    if(!resp||!resp.ok){tbody.innerHTML='<tr><td colspan="5" style="color:var(--red);padding:16px">載入失敗</td></tr>';return;}
+    tbody.innerHTML='';
+    if(!resp.logs||!resp.logs.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-muted)">尚無紀錄</td></tr>';return;}
+    resp.logs.forEach(function(log){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td class="log-time">'+log.time+'</td><td class="log-editor">'+(log.editor||'匿名')+'</td><td class="log-field">'+log.field+'</td><td class="log-old">'+log.oldVal+'</td><td class="log-new">'+log.newVal+'</td>';
+      tbody.appendChild(tr);
+    });
+  };
+  var s=document.createElement('script');
+  s.src=API_URL+'?action=getLogs&callback='+cbName+'&t='+Date.now();
+  document.head.appendChild(s);
+}
+
+// ── EXPORT CSV ────────────────────────────────────────
+function exportCSV(){
+  var csv='名稱,大倉,小倉,需叫貨數,備註\n';
+  data.orderItems.forEach(function(i){csv+=i.name+','+i.big+','+i.small+','+i.order+','+i.note+'\n';});
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='安桁庫存_'+new Date().toLocaleDateString('zh-TW')+'.csv'; a.click();
+}
+
+// ── RENDER ALL ────────────────────────────────────────
+function renderAll(){
+  renderAllProductsTable();
+  renderPigmentSection('bigPigmentTables',data.bigPigments);
+  renderPigmentSection('smallPigmentTables',data.smallPigments);
+  renderToolsTable('bigToolGG',data.bigToolsGG,'bigToolsGG');
+  renderToolsTable('bigToolSI',data.bigToolsSI,'bigToolsSI');
+  renderToolsTable('smallToolGG',data.smallToolsGG,'smallToolsGG');
+  renderToolsTable('smallToolSI',data.smallToolsSI,'smallToolsSI');
+  renderPanelTable(); renderCatalogTable();
+  renderOverview(); renderLowStock();
+}
+
+// ── NAV ───────────────────────────────────────────────
+function showSection(id){
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
+  document.querySelectorAll('nav button').forEach(function(b){b.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  document.querySelector('nav button[data-section="'+id+'"]').classList.add('active');
+  if(id==='logs') loadLogs();
+}
+
+// ── INIT ──────────────────────────────────────────────
+function init(){
+  var saved=localStorage.getItem('anHeng_editor');
+  if(saved) document.getElementById('editorName').value=saved;
+  document.getElementById('editorName').addEventListener('change',function(e){localStorage.setItem('anHeng_editor',e.target.value);});
+
+  var now=new Date();
+  var ds=now.toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('footerDate').textContent=ds;
+
+  // 先用快取或預設資料馬上渲染
+  var cached=localStorage.getItem(LS_KEY);
+  if(cached){try{data=JSON.parse(cached);}catch(e){data=JSON.parse(JSON.stringify(defaultData));}}
+  if(!data.pigIgnore) data.pigIgnore={};
+  renderAll();
+
+  // 再從雲端拉最新
+  cloudGet().then(function(cd){
+    if(cd&&Object.keys(cd).length>0){
+      var changed=mergeCloud(cd);
+      if(!data.pigIgnore) data.pigIgnore={};
+      if(changed){saveLocal();renderAll();}
+    } else if(!cached){
+      data.pigIgnore={};
+      saveLocal(); cloudSaveAll();
+    }
+  });
+
+  setInterval(pollCloud,POLL_MS);
+
+  // 事件綁定
+  document.querySelectorAll('nav button[data-section]').forEach(function(btn){
+    btn.addEventListener('click',function(){showSection(btn.dataset.section);});
+  });
+  document.getElementById('printBtn').addEventListener('click',function(){window.print();});
+  document.getElementById('exportBtn').addEventListener('click',exportCSV);
+  document.getElementById('logsRefreshBtn').addEventListener('click',loadLogs);
+}
+
+// ── Firebase Google 登入 ───────────────────────────────
+var firebaseConfig = {
+  apiKey: "AIzaSyBuSPRCEibMTdLb0jurncrbW2zFrZG47VE",
+  authDomain: "enheng-stock.firebaseapp.com",
+  projectId: "enheng-stock",
+  storageBucket: "enheng-stock.firebasestorage.app",
+  messagingSenderId: "510786281102",
+  appId: "1:510786281102:web:bddf4acb829d1e74f133df"
+};
+
+// 允許登入的 Email 名單（在這裡新增員工帳號）
+var ALLOWED_EMAILS = [
+  'asdesmoxup@gmail.com',
+  'youching99@gmail.com',
+  'Johnny.ting@enhan.com',
+  'johnny.ting@enhan.com',
+  'Johnny.ting@enhan.com.tw',
+  'johnny.ting@enhan.com.tw',
+  'mat@enhan.com.tw',
+];
+// 若名單為空，允許所有人登入（之後可以加限制）
+
+function initFirebaseAuth() {
+  // 動態載入 Firebase SDK
+  var s1 = document.createElement('script');
+  s1.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js';
+  s1.onload = function() {
+    var s2 = document.createElement('script');
+    s2.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js';
+    s2.onload = function() {
+      firebase.initializeApp(firebaseConfig);
+      var auth = firebase.auth();
+
+      // 檢查是否已登入
+      auth.onAuthStateChanged(function(user) {
+        if (user) {
+          // 已登入 — 檢查是否在允許名單
+          if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.map(function(e){return e.toLowerCase();}).includes(user.email.toLowerCase())) {
+            document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
+            document.getElementById('loginLoading').textContent = '';
+            auth.signOut();
+            return;
+          }
+          // 允許進入
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('editorName').value = user.displayName || user.email;
+          localStorage.setItem('anHeng_editor', user.displayName || user.email);
+          init();
+        } else {
+          // 未登入 — 顯示登入畫面
+          document.getElementById('loginLoading').textContent = '';
+        }
+      });
+
+      // 登入按鈕
+      document.getElementById('googleLoginBtn').addEventListener('click', function() {
+        document.getElementById('loginErr').textContent = '';
+        document.getElementById('loginLoading').textContent = '登入中…';
+        var provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(function(err) {
+          document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
+          document.getElementById('loginLoading').textContent = '';
+        });
+      });
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
+
+initFirebaseAuth();
+</script>
+</body>
+</html>
