@@ -672,7 +672,10 @@ function showSection(id){
 }
 
 // ── INIT ──────────────────────────────────────────────
+var _inited = false;
 function init(){
+  if (_inited) return;
+  _inited = true;
   var saved=localStorage.getItem('anHeng_editor');
   if(saved) document.getElementById('editorName').value=saved;
   document.getElementById('editorName').addEventListener('change',function(e){localStorage.setItem('anHeng_editor',e.target.value);});
@@ -754,25 +757,35 @@ function initFirebaseAuth() {
       firebase.initializeApp(firebaseConfig);
       var auth = firebase.auth();
 
-      // 檢查是否已登入
-      auth.onAuthStateChanged(function(user) {
-        if (user) {
-          // 已登入 — 檢查是否在允許名單
-          if (ALLOWED_EMAILS.length > 0 && !emailMatch(ALLOWED_EMAILS, user.email)) {
-            document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
-            document.getElementById('loginLoading').textContent = '';
-            auth.signOut();
-            return;
-          }
-          // 允許進入
-          document.getElementById('loginScreen').classList.add('hidden');
-          document.getElementById('editorName').value = user.displayName || user.email;
-          localStorage.setItem('anHeng_editor', user.displayName || user.email);
-          init();
-        } else {
-          // 未登入 — 顯示登入畫面
+      // 處理登入後的狀態
+      function handleUser(user) {
+        if (!user) {
           document.getElementById('loginLoading').textContent = '';
+          return;
         }
+        if (ALLOWED_EMAILS.length > 0 && !emailMatch(ALLOWED_EMAILS, user.email)) {
+          document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
+          document.getElementById('loginLoading').textContent = '';
+          auth.signOut();
+          return;
+        }
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('editorName').value = user.displayName || user.email;
+        localStorage.setItem('anHeng_editor', user.displayName || user.email);
+        init();
+      }
+
+      // 先處理 redirect 回來的結果
+      auth.getRedirectResult().then(function(result) {
+        if (result && result.user) {
+          handleUser(result.user);
+        } else {
+          // 沒有 redirect 結果，檢查現有登入狀態
+          auth.onAuthStateChanged(handleUser);
+        }
+      }).catch(function(err) {
+        document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
+        auth.onAuthStateChanged(handleUser);
       });
 
       // 登入按鈕
@@ -780,18 +793,10 @@ function initFirebaseAuth() {
         document.getElementById('loginErr').textContent = '';
         document.getElementById('loginLoading').textContent = '跳轉到 Google 登入…';
         var provider = new firebase.auth.GoogleAuthProvider();
-        // 用 redirect 方式登入，手機相容性更好
         auth.signInWithRedirect(provider).catch(function(err) {
           document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
           document.getElementById('loginLoading').textContent = '';
         });
-      });
-
-      // 處理 redirect 登入後的結果
-      auth.getRedirectResult().catch(function(err) {
-        if (err.code !== 'auth/no-current-user') {
-          document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
-        }
       });
     };
     document.head.appendChild(s2);
