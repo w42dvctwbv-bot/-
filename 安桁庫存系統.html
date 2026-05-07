@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>安桁庫存管理系統</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -230,6 +233,7 @@ footer{margin-top:36px;padding:18px 32px;border-top:1px solid var(--border-light
 <footer>
   <span>Giorgio Graesan · 安桁庫存系統</span>
   <span id="footerDate"></span>
+  <span style="opacity:0.4;">v20260507</span>
 </footer>
 
 <script>
@@ -318,9 +322,13 @@ function cloudSaveAll(){
 }
 
 // ── merge cloud data ──────────────────────────────────
+var lastLocalEdit = 0; // 記錄最後一次本地編輯的時間
+
 function mergeCloud(cd){
   if(!cd) return false;
-  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs','ignoreList'];
+  // 如果 30 秒內有本地編輯，跳過雲端同步（避免覆蓋剛改的資料）
+  if(Date.now() - lastLocalEdit < 30000) return false;
+  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs'];
   var changed=false;
   keys.forEach(function(k){
     if(cd[k]!==undefined&&JSON.stringify(cd[k])!==JSON.stringify(data[k])){
@@ -347,6 +355,7 @@ function numInput(val,onChange){
   var old=val||'';
   inp.addEventListener('focus',function(){old=inp.value;});
   inp.addEventListener('change',function(){
+    lastLocalEdit=Date.now(); // 記錄本地編輯時間
     onChange(inp.value,old); old=inp.value; saveLocal();
   });
   return inp;
@@ -354,7 +363,10 @@ function numInput(val,onChange){
 function textInput(val,onChange){
   var inp=document.createElement('input');
   inp.type='text'; inp.value=val||''; inp.placeholder='備註…';
-  inp.addEventListener('change',function(){onChange(inp.value);saveLocal();});
+  inp.addEventListener('change',function(){
+    lastLocalEdit=Date.now();
+    onChange(inp.value);saveLocal();
+  });
   return inp;
 }
 
