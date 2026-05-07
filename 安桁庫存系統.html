@@ -725,6 +725,9 @@ var ALLOWED_EMAILS = [
   'asdesmoxup@gmail.com',
   'youching99@gmail.com',
   'Johnny.ting@enhan.com',
+  'johnny.ting@enhan.com',
+  'Johnny.ting@enhan.com.tw',
+  'johnny.ting@enhan.com.tw',
   'mat@enhan.com.tw',
 ];
 // 若名單為空，允許所有人登入（之後可以加限制）
@@ -744,7 +747,7 @@ function initFirebaseAuth() {
       auth.onAuthStateChanged(function(user) {
         if (user) {
           // 已登入 — 檢查是否在允許名單
-          if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(user.email)) {
+          if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.map(function(e){return e.toLowerCase();}).includes(user.email.toLowerCase())) {
             document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
             document.getElementById('loginLoading').textContent = '';
             auth.signOut();
