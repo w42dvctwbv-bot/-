@@ -754,57 +754,63 @@ function initFirebaseAuth() {
       firebase.initializeApp(firebaseConfig);
       var auth = firebase.auth();
 
-      // 唯一的登入處理入口
-      var _inited = false;
+      var _entered = false;
       function enterSystem(user) {
-        if (_inited) return;
-        _inited = true;
+        if (_entered) return;
+        if (!user) { document.getElementById('loginLoading').textContent = ''; return; }
         if (ALLOWED_EMAILS.length > 0 && !emailMatch(ALLOWED_EMAILS, user.email)) {
           document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
           document.getElementById('loginLoading').textContent = '';
-          _inited = false;
           auth.signOut();
           return;
         }
+        _entered = true;
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById('editorName').value = user.displayName || user.email;
         localStorage.setItem('anHeng_editor', user.displayName || user.email);
         init();
       }
 
-      // 先等 redirect 結果，再看 auth 狀態
-      var _authHandled = false;
-      auth.getRedirectResult().then(function(result) {
-        _authHandled = true;
-        if (result && result.user) {
-          enterSystem(result.user);
-        } else {
-          // 沒有 redirect，看目前登入狀態
-          var unsubscribe = auth.onAuthStateChanged(function(user) {
-            unsubscribe(); // 只跑一次
-            if (user) {
-              enterSystem(user);
-            } else {
-              document.getElementById('loginLoading').textContent = '';
-            }
-          });
-        }
-      }).catch(function(err) {
-        _authHandled = true;
-        document.getElementById('loginErr').textContent = '登入失敗，請重試';
-        document.getElementById('loginLoading').textContent = '';
-        var unsubscribe = auth.onAuthStateChanged(function(user) {
-          unsubscribe();
-          if (user) enterSystem(user);
+      var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // 手機：處理 redirect 結果
+        document.getElementById('loginLoading').textContent = '處理中…';
+        auth.getRedirectResult().then(function(result) {
+          if (result && result.user) {
+            enterSystem(result.user);
+          } else {
+            document.getElementById('loginLoading').textContent = '';
+            auth.onAuthStateChanged(function(user) {
+              if (!_entered) enterSystem(user);
+            });
+          }
+        }).catch(function() {
+          document.getElementById('loginLoading').textContent = '';
         });
-      });
+      } else {
+        // 桌機：直接看目前登入狀態
+        auth.onAuthStateChanged(function(user) {
+          if (!_entered) enterSystem(user);
+        });
+      }
 
       // 登入按鈕
       document.getElementById('googleLoginBtn').addEventListener('click', function() {
         document.getElementById('loginErr').textContent = '';
-        document.getElementById('loginLoading').textContent = '跳轉中…';
         var provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithRedirect(provider);
+        if (isMobile) {
+          document.getElementById('loginLoading').textContent = '跳轉中…';
+          auth.signInWithRedirect(provider);
+        } else {
+          document.getElementById('loginLoading').textContent = '登入中…';
+          auth.signInWithPopup(provider).then(function(result) {
+            enterSystem(result.user);
+          }).catch(function(err) {
+            document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
+            document.getElementById('loginLoading').textContent = '';
+          });
+        }
       });
     };
     document.head.appendChild(s2);
