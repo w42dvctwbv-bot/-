@@ -328,7 +328,7 @@ function mergeCloud(cd){
   if(!cd) return false;
   // 如果 30 秒內有本地編輯，跳過雲端同步（避免覆蓋剛改的資料）
   if(Date.now() - lastLocalEdit < 30000) return false;
-  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs'];
+  var keys=['orderItems','bigPigments','smallPigments','bigToolsGG','bigToolsSI','smallToolsGG','smallToolsSI','panels','catalogs','pigIgnore'];
   var changed=false;
   keys.forEach(function(k){
     if(cd[k]!==undefined&&JSON.stringify(cd[k])!==JSON.stringify(data[k])){
@@ -473,20 +473,25 @@ function renderLowStock(){
     if(!isNaN(n)&&n<LOW) pa.push({name:i.name,qty:i.big,section:i.brand==='SI'?'Stucco':'GG'});
   });
   makeAlertBox('lowStockPaint','藝術塗料警示',pa,LOW);
+
+  if(!data.pigIgnore) data.pigIgnore={};
   var pia=[];
-  function scanPig(rows,label){
+  function scanPig(rows,label,containerPrefix){
     rows.forEach(function(row){
+      var ignoreKey=containerPrefix+'_'+row.group;
+      var ig=data.pigIgnore[ignoreKey]||{big:[],small:[]};
       if(row.big) row.codes.forEach(function(c,ci){
-        if(row.bigIgnore&&row.bigIgnore[ci]) return;
+        if(ig.big[ci]) return;
         if(parseFloat(row.big[ci])===0) pia.push({name:c,qty:0,section:label+'大罐'});
       });
       row.codes.forEach(function(c,ci){
-        if(row.smallIgnore&&row.smallIgnore[ci]) return;
+        if(ig.small[ci]) return;
         if(parseFloat(row.small[ci])===0) pia.push({name:c,qty:0,section:label+'小罐'});
       });
     });
   }
-  scanPig(data.bigPigments.rows,'大倉'); scanPig(data.smallPigments.rows,'小倉');
+  scanPig(data.bigPigments.rows,'大倉','bigPigmentTables');
+  scanPig(data.smallPigments.rows,'小倉','smallPigmentTables');
   makeAlertBox('lowStockPigment','色料缺貨警示',pia,1);
 }
 
@@ -502,23 +507,29 @@ function renderPigmentSection(containerId,pigData){
     row.codes.forEach(function(code){var th=document.createElement('th');th.className='color-code';th.textContent=code;th.style.padding='5px 7px';hr.appendChild(th);});
     thead.appendChild(hr); tbl.appendChild(thead);
     var tbody=document.createElement('tbody');
+
+    // 從獨立的 pigIgnore 物件讀取 ignore 狀態
+    var ignoreKey = containerId + '_' + row.group;
+    if(!data.pigIgnore) data.pigIgnore={};
+    if(!data.pigIgnore[ignoreKey]) data.pigIgnore[ignoreKey]={big:[],small:[]};
+    var ignoreState = data.pigIgnore[ignoreKey];
+
     if(row.big){
       var tr=document.createElement('tr');
       var td0=document.createElement('td');td0.className='row-label';td0.textContent='大罐';tr.appendChild(td0);
       row.big.forEach(function(val,ci){
         var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
         var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
-        var inp=numInput(val,function(v,ov){row.big[ci]=v;cloudSave('bigPigments',data.bigPigments,'大倉色料 '+row.group+' '+row.codes[ci],ov);renderLowStock();});
-        if(!row.bigIgnore||!row.bigIgnore[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+        var inp=numInput(val,function(v,ov){row.big[ci]=v;cloudSave(containerId==='bigPigmentTables'?'bigPigments':'smallPigments',containerId==='bigPigmentTables'?data.bigPigments:data.smallPigments,'色料 '+row.group+' 大罐 '+row.codes[ci],ov);renderLowStock();});
+        if(!ignoreState.big[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
         wrap.appendChild(inp);
         var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
-        if(row.bigIgnore&&row.bigIgnore[ci]) ib.classList.add('active');
+        if(ignoreState.big[ci]) ib.classList.add('active');
         ib.addEventListener('click',function(){
-          if(!row.bigIgnore) row.bigIgnore=new Array(row.codes.length).fill(false);
-          row.bigIgnore[ci]=!row.bigIgnore[ci];
-          ib.classList.toggle('active',row.bigIgnore[ci]);
-          inp.style.color=row.bigIgnore[ci]?'var(--text-muted)':(parseFloat(row.big[ci])===0?'var(--red)':'');
-          cloudSave('bigPigments',data.bigPigments,'大倉色料忽略 '+row.codes[ci],'');
+          ignoreState.big[ci]=!ignoreState.big[ci];
+          ib.classList.toggle('active',ignoreState.big[ci]);
+          inp.style.color=ignoreState.big[ci]?'var(--text-muted)':(parseFloat(row.big[ci])===0?'var(--red)':'');
+          cloudSave('pigIgnore',data.pigIgnore,'色料不追蹤 '+row.group+' 大罐 '+row.codes[ci],'');
           renderLowStock();
         });
         wrap.appendChild(ib);
@@ -531,17 +542,16 @@ function renderPigmentSection(containerId,pigData){
     row.small.forEach(function(val,ci){
       var td=document.createElement('td');td.className='num-cell';td.style.border='1px solid var(--border-light)';
       var wrap=document.createElement('div');wrap.style.display='flex';wrap.style.alignItems='center';wrap.style.justifyContent='center';wrap.style.gap='2px';
-      var inp=numInput(val,function(v,ov){row.small[ci]=v;cloudSave('bigPigments',data.bigPigments,'大倉色料 '+row.group+' '+row.codes[ci],ov);renderLowStock();});
-      if(!row.smallIgnore||!row.smallIgnore[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
+      var inp=numInput(val,function(v,ov){row.small[ci]=v;cloudSave(containerId==='bigPigmentTables'?'bigPigments':'smallPigments',containerId==='bigPigmentTables'?data.bigPigments:data.smallPigments,'色料 '+row.group+' 小罐 '+row.codes[ci],ov);renderLowStock();});
+      if(!ignoreState.small[ci]) { if(parseFloat(val)===0) inp.style.color='var(--red)'; }
       wrap.appendChild(inp);
       var ib=document.createElement('button');ib.className='pig-ignore';ib.title='不追蹤';ib.textContent='🔕';
-      if(row.smallIgnore&&row.smallIgnore[ci]) ib.classList.add('active');
+      if(ignoreState.small[ci]) ib.classList.add('active');
       ib.addEventListener('click',function(){
-        if(!row.smallIgnore) row.smallIgnore=new Array(row.codes.length).fill(false);
-        row.smallIgnore[ci]=!row.smallIgnore[ci];
-        ib.classList.toggle('active',row.smallIgnore[ci]);
-        inp.style.color=row.smallIgnore[ci]?'var(--text-muted)':(parseFloat(row.small[ci])===0?'var(--red)':'');
-        cloudSave('bigPigments',data.bigPigments,'大倉色料忽略 '+row.codes[ci],'');
+        ignoreState.small[ci]=!ignoreState.small[ci];
+        ib.classList.toggle('active',ignoreState.small[ci]);
+        inp.style.color=ignoreState.small[ci]?'var(--text-muted)':(parseFloat(row.small[ci])===0?'var(--red)':'');
+        cloudSave('pigIgnore',data.pigIgnore,'色料不追蹤 '+row.group+' 小罐 '+row.codes[ci],'');
         renderLowStock();
       });
       wrap.appendChild(ib);
