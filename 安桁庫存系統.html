@@ -723,13 +723,24 @@ var firebaseConfig = {
 // 允許登入的 Email 名單（在這裡新增員工帳號）
 var ALLOWED_EMAILS = [
   'asdesmoxup@gmail.com',
-  'you.ching99@gmail.com',
-  'Johnny.ting@enhan.com',
+  'youching99@gmail.com',
   'johnny.ting@enhan.com',
-  'Johnny.ting@enhan.com.tw',
   'johnny.ting@enhan.com.tw',
   'mat@enhan.com.tw',
 ];
+// 不分大小寫、忽略 gmail 的點（Google 把 you.ching99 和 youching99 視為同一帳號）
+function emailMatch(allowed, actual) {
+  var a = actual.toLowerCase();
+  return allowed.some(function(e) {
+    var e2 = e.toLowerCase();
+    if (a === e2) return true;
+    // Gmail 忽略點
+    if (a.endsWith('@gmail.com') && e2.endsWith('@gmail.com')) {
+      return a.split('@')[0].replace(/\./g,'') === e2.split('@')[0].replace(/\./g,'');
+    }
+    return false;
+  });
+}
 // 若名單為空，允許所有人登入（之後可以加限制）
 
 function initFirebaseAuth() {
@@ -747,7 +758,7 @@ function initFirebaseAuth() {
       auth.onAuthStateChanged(function(user) {
         if (user) {
           // 已登入 — 檢查是否在允許名單
-          if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.map(function(e){return e.toLowerCase();}).includes(user.email.toLowerCase())) {
+          if (ALLOWED_EMAILS.length > 0 && !emailMatch(ALLOWED_EMAILS, user.email)) {
             document.getElementById('loginErr').textContent = '此帳號沒有存取權限：' + user.email;
             document.getElementById('loginLoading').textContent = '';
             auth.signOut();
