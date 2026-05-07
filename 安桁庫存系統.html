@@ -778,12 +778,20 @@ function initFirebaseAuth() {
       // 登入按鈕
       document.getElementById('googleLoginBtn').addEventListener('click', function() {
         document.getElementById('loginErr').textContent = '';
-        document.getElementById('loginLoading').textContent = '登入中…';
+        document.getElementById('loginLoading').textContent = '跳轉到 Google 登入…';
         var provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(function(err) {
+        // 用 redirect 方式登入，手機相容性更好
+        auth.signInWithRedirect(provider).catch(function(err) {
           document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
           document.getElementById('loginLoading').textContent = '';
         });
+      });
+
+      // 處理 redirect 登入後的結果
+      auth.getRedirectResult().catch(function(err) {
+        if (err.code !== 'auth/no-current-user') {
+          document.getElementById('loginErr').textContent = '登入失敗：' + err.message;
+        }
       });
     };
     document.head.appendChild(s2);
